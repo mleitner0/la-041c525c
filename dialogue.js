@@ -1,4 +1,4 @@
-// All lines are original parody writing. Bosses are PARODY characters, not real quotes.
+// Original writing, not real quotes.
 const FALLACIES={
 "Appeal to Emotion":"Using feelings instead of evidence to win the point.",
 "Moving the Goalposts":"Changing the standard of proof after it has been met.",
@@ -58,6 +58,6 @@ const TRUMP_RANTS=[
 ["I screamed at the sky on Election Night and I'd do it again!","The sky didn't answer. The sky's on my side. Great sky. Blue, like your mood."],
 ["He used a straw and I've been personally victimized!","Paper straws, they dissolve! Like your argument. Plastic straw, like my winning streak: lasts forever."]];
 const OPPONENTS={
-left:[{name:"Skylar Woke-Hart",title:"Campus Activist",color:"#a78bfa"},{name:"Chad Narrativeson",title:"Cable Pundit",color:"#60a5fa"},{name:"Brynn Influenzer",title:"Lifestyle Influencer",color:"#f472b6"},{name:"Prof. Tenure McTheory",title:"Tenured Professor",color:"#34d399"},{name:"\"Destiny\" (PARODY)",title:"FINAL BOSS · Rapid-fire stat streamer",color:"#f59e0b",boss:true}],
-right:[{name:"Hank Bootstrap",title:"Small-town Mechanic",color:"#ef4444"},{name:"Pastor Calm Reason",title:"Socratic Pastor",color:"#f97316"},{name:"Dr. Free Market",title:"Economist",color:"#eab308"},{name:"Ranger Constitution",title:"Rancher",color:"#84cc16"},{name:"\"Andrew Wilson\" (PARODY)",title:"FINAL BOSS · Calm Socratic questioner",color:"#dc2626",boss:true}]};
+left:[{name:"Skylar Woke-Hart",title:"Campus Activist",color:"#a78bfa"},{name:"Chad Narrativeson",title:"Cable Pundit",color:"#60a5fa"},{name:"Brynn Influenzer",title:"Lifestyle Influencer",color:"#f472b6"},{name:"Prof. Tenure McTheory",title:"Tenured Professor",color:"#34d399"},{name:"\"Destiny\"",title:"FINAL BOSS · Rapid-fire stat streamer",color:"#f59e0b",boss:true}],
+right:[{name:"Hank Bootstrap",title:"Small-town Mechanic",color:"#ef4444"},{name:"Pastor Calm Reason",title:"Socratic Pastor",color:"#f97316"},{name:"Dr. Free Market",title:"Economist",color:"#eab308"},{name:"Ranger Constitution",title:"Rancher",color:"#84cc16"},{name:"\"Andrew Wilson\"",title:"FINAL BOSS · Calm Socratic questioner",color:"#dc2626",boss:true}]};
 const BOSS_EXTRA={left:["*speaking at 400 wpm* Per my 37 open tabs, your point is statistically irrelevant, next.","I have a spreadsheet for this. And a spreadsheet for that spreadsheet."],right:["*sips coffee calmly* Define 'good.' Take your time. I'll wait.","So you agree that you can't ground that claim. Interesting."]};
