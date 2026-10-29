@@ -1,6 +1,6 @@
 // Logic Arena portrait art: hand-built inline SVG caricatures.
 // portrait(key, mood) -> SVG string. mood: 'calm' | 'pleased' | 'annoyed' | 'furious'.
-const ART_KEYS={left:['skylar','whoopi','brynn','harris','destiny'],right:['hank','timpool','market','crowder','wilson']};
+const ART_KEYS={left:['skylar','whoopi','harris','destiny'],right:['hank','timpool','crowder','wilson']};
 // Photo portraits (AI-generated satire images). s = square (select tiles), f = full (stage). The secret entry uses neutral file names.
 const PHOTOS={whoopi:'assets/p/left_whoopi',harris:'assets/p/left_harris',destiny:'assets/p/left_destiny_boss',timpool:'assets/p/right_timpool',crowder:'assets/p/right_crowder',wilson:'assets/p/right_wilson_boss',trump:{s:'assets/s/x1.jpg',f:'assets/s/x2.jpg'}};
 const CLIPS={whoopi:'left_whoopi',harris:'left_harris',destiny:'left_destiny_boss',timpool:'right_timpool',crowder:'right_crowder'};

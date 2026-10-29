@@ -1,8 +1,8 @@
 const $=s=>document.querySelector(s),app=$('#app');
 let G=null,timerId=null,typeId=null,vsT=null,CS='left',SID=0,BACK=null,IGN=false;const TM=new Set(),TI=new Set();
 function loadSave(){let d={};try{d=JSON.parse(localStorage.getItem('la_save')||'{}');if(!d||typeof d!=='object'||Array.isArray(d))d={}}catch(e){d={}}
-const cl=v=>{v=parseInt(v,10);return Number.isFinite(v)?Math.min(5,Math.max(0,v)):0};const p=d.prog&&typeof d.prog==='object'?d.prog:{};
-return {prog:{left:cl(p.left),right:cl(p.right)},sound:d.sound!==false,trump:d.trump===true}}
+const N=s=>OPPONENTS[s].length,old=d.ver!==2,cl=(v,s)=>{v=parseInt(v,10);if(!Number.isFinite(v))return 0;v=Math.max(0,v);if(old&&v>=3)v-=1;return Math.min(N(s),v)};const p=d.prog&&typeof d.prog==='object'?d.prog:{};
+return {ver:2,prog:{left:cl(p.left,'left'),right:cl(p.right,'right')},sound:d.sound!==false,trump:d.trump===true}}
 let S=loadSave();
 const save=()=>{try{localStorage.setItem('la_save',JSON.stringify(S))}catch(e){}};
 // every pending timer is tracked and tagged with the screen session; cleanup() kills them all
@@ -26,17 +26,30 @@ const sp=document.createElement('div');sp.id='sparkles';sp.innerHTML=Array.from(
 const m=document.createElement('div');m.id='maga';m.textContent='MAGA';document.body.appendChild(m)}
 function themeOff(){document.body.classList.remove('theme-gold');['#goldbg','#sparkles','#maga'].forEach(s=>{const e=$(s);e&&e.remove()})}
 document.addEventListener('visibilitychange',()=>document.body.classList.toggle('paused',document.hidden));
-// Full-screen 3:4 clip. Skips on tap, ended, error, or timeout; reduced motion shows the poster plus Continue.
-function playClip(src,poster,done){killVideo();let fin=false;const sid=SID,go=()=>{if(fin||sid!==SID)return;fin=true;killVideo();done()};
+// Full-screen 3:4 clip. Starts muted+inline inside the tap that triggered it (iOS rule).
+// If autoplay is refused (iOS Low Power Mode, data saver) or Reduce Motion is on, a big Play button is shown instead of skipping.
+// Only the Skip button, the clip ending, or a real load error moves on; a slow network gets a loading state and a Tap to play after 10s.
+function playClip(src,poster,done){killVideo();let fin=false,started=false,bad=false,run=false,acc=0,last=0,cap=0;const sid=SID,go=()=>{if(fin||sid!==SID)return;fin=true;clearInterval(cap);TI.delete(cap);killVideo();done()};
  const rm=matchMedia('(prefers-reduced-motion: reduce)').matches,o=document.createElement('div');o.className='vid';
- o.innerHTML=rm?`<div class=vbox><img src="${poster}" alt=""></div><button class="pri vcont">Continue</button>`:`<div class=vbox><video playsinline muted autoplay preload="metadata" poster="${poster}"></video></div><p class=skip>Tap to skip</p>`;
- document.body.appendChild(o);o.onclick=go;
- if(!rm){const v=o.querySelector('video');v.muted=true;v.setAttribute('webkit-playsinline','');v.addEventListener('ended',go);v.addEventListener('error',go);v.src=src;
-  const p=v.play();if(p&&p.catch)p.catch(()=>later(go,1500));later(()=>{if(v.readyState<2)go()},5000);later(go,12000)}}
+ o.innerHTML=`<div class=vbox><video playsinline webkit-playsinline muted preload="auto" poster="${poster}"></video><p class=vload>Loading clip…</p><button class="vplay" hidden><i class=tri></i>Tap to play</button></div><button class="vskip">Skip</button>`;
+ document.body.appendChild(o);const v=o.querySelector('video'),pb=o.querySelector('.vplay'),ld=o.querySelector('.vload');
+ const ask=()=>{if(started||fin||bad)return;ld.hidden=true;pb.hidden=false};
+ const tryPlay=()=>{v.muted=true;let p;try{p=v.play()}catch(e){ask();return}if(p&&p.catch)p.catch(ask)};
+ o.querySelector('.vskip').onclick=e=>{e.stopPropagation();go()};
+ pb.onclick=e=>{e.stopPropagation();if(bad)return;pb.hidden=true;ld.hidden=false;tryPlay()};
+ v.onclick=e=>{e.stopPropagation();if(v.paused)tryPlay()};
+ // Safety cap counts only real playing time (stalls/buffering don't count); one interval, cleared in go() and cleanup().
+ v.addEventListener('playing',()=>{started=true;run=true;last=Date.now();ld.hidden=true;pb.hidden=true;
+  if(!cap){cap=setInterval(()=>{if(fin||sid!==SID){clearInterval(cap);TI.delete(cap);return}const n=Date.now();if(run&&!v.paused&&v.readyState>=3)acc+=n-last;last=n;if(acc>=Math.max(8,(v.duration||8)+3)*1000)go()},250);TI.add(cap)}});
+ ['waiting','stalled','pause'].forEach(ev=>v.addEventListener(ev,()=>{run=false}));
+ v.addEventListener('ended',go);v.addEventListener('error',()=>{if(fin)return;bad=true;pb.hidden=true;ld.hidden=false;ld.textContent='Clip unavailable.';later(go,1200)});
+ v.muted=true;v.defaultMuted=true;v.src=src;
+ if(rm){ld.hidden=true;pb.hidden=false;pb.innerHTML='<i class=tri></i>Play clip'}  // Reduce Motion: never autoplay, but the clip is one tap away
+ else{tryPlay();later(()=>{if(!started)ask()},10000)}}
 function goTitle(){stopAll();BACK=null;try{if(history.state&&history.state.la){IGN=true;history.back()}}catch(e){}app.innerHTML=`<h1>LOGIC ARENA</h1><p class=c><small>A satirical debate game.</small></p>
 <div class=heroes>${portrait('heroL','calm')}<b class=vsx>VS</b>${portrait('heroR','calm')}</div>
-<button class="pri blue" onclick="pick('left')">Debate against the Left <small>(${S.prog.left}/5)</small></button>
-<button class="pri red" onclick="pick('right')">Debate against the Right <small>(${S.prog.right}/5)</small></button>
+<button class="pri blue" onclick="pick('left')">Debate against the Left <small>(${S.prog.left}/${OPPONENTS.left.length})</small></button>
+<button class="pri red" onclick="pick('right')">Debate against the Right <small>(${S.prog.right}/${OPPONENTS.right.length})</small></button>
 <div class="row"><button onclick="glossary()">Fallacy Glossary</button><button onclick="S.sound=!S.sound;save();goTitle()">Sound: ${S.sound?'On':'Off'}</button></div>
 <button onclick="if(confirm('Reset all progress?')){localStorage.removeItem('la_save');location.reload()}">Restart / Reset Progress</button>`}
 function glossary(){stopAll();setBack(goTitle);app.innerHTML=`<button class=back onclick="goTitle()">← Back</button><h2>Fallacy Glossary</h2>${Object.entries(FALLACIES).map(([k,v])=>`<p><b>${k}</b><br><small>${v}</small></p>`).join('')}<button class="pri" onclick="goTitle()">Back</button>`}
@@ -44,8 +57,8 @@ function hero(side){return side==='left'?'heroL':'heroR'}
 // CHARACTER SELECT
 function pick(side){stopAll();CS=side;setBack(goTitle);const ops=OPPONENTS[side],p=S.prog[side];
 const tile=(o,i)=>{const locked=i>p,beaten=i<p,k=ART_KEYS[side][i];return `<button class="tile ${side} ${o.boss?'boss':''} ${locked?'locked':''}" aria-disabled="${locked}" onclick="tileTap('${side}',${i})">${o.boss?'<span class=bossb>BOSS</span>':''}${beaten?CHECK:''}<span class=tp>${portrait(k,'calm','sq')}</span>${locked?`<span class=lk>${LOCK}</span>`:''}<span class=tn>${o.name}</span></button>`};
-app.innerHTML=`<div class="cs ${side}"><button class=back onclick="goTitle()">← Back</button><h2>Choose your opponent</h2><p class=c><small>Debate against the ${side==='left'?'Left':'Right'} · ${p}/5 beaten</small></p>
-<div class=grid>${ops.slice(0,4).map(tile).join('')}</div><div class=bossrow>${tile(ops[4],4)}</div>
+app.innerHTML=`<div class="cs ${side}"><button class=back onclick="goTitle()">← Back</button><h2>Choose your opponent</h2><p class=c><small>Debate against the ${side==='left'?'Left':'Right'} · ${p}/${ops.length} beaten</small></p>
+<div class="grid g${ops.length-1}">${ops.slice(0,-1).map(tile).join('')}</div><div class=bossrow>${tile(ops[ops.length-1],ops.length-1)}</div>
 ${S.trump?`<div class=bossrow><button class="tile special" onclick="trumpDetail()"><span class=bossb>SECRET</span><span class=tp>${portrait('trump','calm','sq')}</span><span class=tn>"Trump"</span></button></div>`:''}
 <div id=toast role=status></div></div>`}
 function tileTap(side,i){if(i>S.prog[side]){const t=$('#toast');t.textContent=`Beat ${OPPONENTS[side][i-1].name} to unlock`;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');beep(200,.08);return}detail(side,i)}
@@ -81,7 +94,7 @@ function phase2(){return G.op.boss&&(G.side==='left'?G.anger:Math.max(G.anger,G.
 function turn(){clearInterval(timerId);const g=G;if(g.r>=g.rs.length)return g.op.unbeatable?end('lose',smokyClose()):end(g.side==='right'?'survive':'lose','You ran out of rounds!');
 const R=g.rs[g.r];let claim=R[0];if(phase2())claim=BOSS_EXTRA[g.side][g.r%2]+' '+claim;
 setBack(()=>pick(G.side));app.innerHTML=battle(`<div id=opts></div><div class=foot><small>Round ${g.r+1}/${g.rs.length}</small><button class=back2 onclick="pick(G.side)">← Back to Ladder</button></div>`);animBars();
-type($('#bub'),claim,()=>{let opts;if(g.side==='left')opts=shuffle([['strong',R[2]],['medium',R[3]],['weak',R[4]],['fallacy',R[5]],['troll',R[6]]]);else opts=shuffle(R[1].map((o,k)=>['r'+k,o[0]]));
+type($('#bub'),claim,()=>{let opts;if(g.side==='left')opts=shuffle([['strong',R[2]],['strong',R[3]],['strong',R[4]],['troll',R[5]]]);else opts=shuffle(R[1].map((o,k)=>['r'+k,o[0]]));
 g.cur=opts;$('#opts').innerHTML=opts.map((o,k)=>`<button class=opt onclick="choose(${k})">${o[1]}</button>`).join('');
 if(phase2()){let t=10;$('#tm').textContent='PHASE 2 · '+t+'s';timerId=every(()=>{t--;$('#tm').textContent='PHASE 2 · '+t+'s';if(t<=0){clearInterval(timerId);choose(-1)}},1000)}})}
 function choose(k){clearInterval(timerId);const g=G,R=g.rs[g.r];if(g.busy)return;g.busy=true;g.picks++;let msg='';const b={a:g.anger,c:g.comp,r:g.resp};
@@ -103,7 +116,7 @@ const sh=[];if(g.side==='left'){if(g.anger>b.a)sh.push('o');if(g.comp<b.c)sh.pus
 later(()=>modal(msg,()=>{g.busy=false;if(g.side==='left'){if(g.anger>=100)return end('win');if(g.comp<=0)return end('lose','You lost your composure!')}else{if(g.anger>=100)return end('lose',g.op.unbeatable?smokyClose():'You lost your cool!');if(g.resp>=100&&!g.op.unbeatable)return end('respect')}turn()}),450)}
 function modal(html,cb){const sid=SID,m=document.createElement('div');m.className='modal';m.innerHTML=`<div>${html}<button class=pri>Continue</button></div>`;m.querySelector('button').onclick=()=>{m.remove();if(sid===SID)cb()};document.body.appendChild(m)}
 function end(res,why=''){clearInterval(timerId);const g=G;setBack(()=>pick(g.side));const won=res==='win'||res==='respect'||res==='survive';
-if(won&&g.i===S.prog[g.side]&&S.prog[g.side]<5)S.prog[g.side]++;
+if(won&&g.i===S.prog[g.side]&&S.prog[g.side]<OPPONENTS[g.side].length)S.prog[g.side]++;
 const unlock=g.side==='left'&&g.allTroll&&g.picks>0&&!S.trump;if(unlock)S.trump=true;save();
 const ck=CLIPS[opKey(g.op)],beatThem=(res==='win'||res==='respect')&&ck,mocked=g.op.unbeatable&&res==='lose';
 const show=()=>{const t={win:'RAGE QUIT! You win!',lose:'Defeat',respect:'You earned their respect! You win!',survive:'You survived the debate.'}[res];
@@ -118,12 +131,33 @@ function smokyClose(){return WILSON_CLOSERS[Math.floor(Math.random()*WILSON_CLOS
 function reveal(){playClip('assets/s/x3.mp4','assets/s/x4.jpg',revealBanner)}
 function revealBanner(){setBack(()=>{const r=document.querySelector('.reveal');if(r)r.remove();themeOff();pick('left')});const r=document.createElement('div');r.className='reveal';r.innerHTML=`<div class=flash></div><div class=rv><div class=rb>A NEW CHALLENGER HAS APPEARED!</div><div class=drop>${portrait('trump','calm')}</div><h2>"Trump"</h2><p>You trolled through an entire debate. He noticed. He was impressed. He wants a turn.</p><button class=pri id=rvc>Continue</button></div>`;document.body.appendChild(r);themeOn(true);beep(880,.3);$('#rvc').onclick=()=>{r.remove();themeOff();pick('left')}}
 // SECRET MODE: one round per opponent, auto-win, doesn't affect normal progress
-function trumpStart(){stopAll();const side=Math.random()<.5?'left':'right';G={trump:true,side,i:0,ops:[...OPPONENTS.left.slice(0,4),OPPONENTS.left[4],OPPONENTS.right[4]],anger:0,resp:0,comp:100,r:0,rs:[0],deck:shuffle(TRUMP_RANTS)};trumpTurn()}
+function trumpStart(){stopAll();const side=Math.random()<.5?'left':'right';G={trump:true,side,i:0,ops:[...OPPONENTS.left,OPPONENTS.right[OPPONENTS.right.length-1]],anger:0,resp:0,comp:100,r:0,rs:[0],deck:shuffle(TRUMP_RANTS)};trumpTurn()}
 function trumpTurn(){const g=G;if(!g||!g.trump)return;themeOn();setBack(()=>pick(CS));g.op=g.ops[g.i];g.anger=0;g.pv=null;if(!g.deck.length)g.deck=shuffle(TRUMP_RANTS);const R=g.deck.pop();
 app.innerHTML=battle(`<p class=c><small>Opponent ${g.i+1}/${g.ops.length}</small></p><div id=opts></div><div class=foot><button class=back2 onclick="pick(CS)">← Quit</button></div>`);animBars();
 type($('#bub'),R[0],()=>{$('#opts').innerHTML=`<button class="pri opt" onclick="trumpHit(this)">${R[1]}</button>`})}
 function trumpHit(btn){const g=G;if(!g||!g.trump||g.hit===g.i)return;g.hit=g.i;if(btn)btn.disabled=true;const pb=$('#pbub');if(pb&&btn){pb.hidden=false;pb.textContent=btn.textContent}g.anger=100;beep(150,.4);refresh(['o'],{o:'furious'});$('#opav').classList.add('melt');
 later(()=>modal(`<h3>TOTAL MELTDOWN</h3><p>${g.op.name} has left the building.</p>`,()=>{g.i++;g.i<g.ops.length?trumpTurn():trumpEnd()}),1200)}
-function trumpEnd(){themeOn();setBack(()=>pick(CS));app.innerHTML=`<h1>VICTORY LAP</h1><div class="big c">${portrait('trump','calm')}</div><p class=c>"Six for six. Nobody has ever won debates like this. People are crying, big strong debaters, crying. Thank you, thank you."</p><button class=pri onclick="vsTrump()">Run it again</button><button onclick="pick(CS)">Back</button><button onclick="goTitle()">Title</button>`}
+function trumpEnd(){themeOn();setBack(()=>pick(CS));app.innerHTML=`<h1>VICTORY LAP</h1><div class="big c">${portrait('trump','calm')}</div><p class=c>"Five for five. Nobody has ever won debates like this. People are crying, big strong debaters, crying. Thank you, thank you."</p><button class=pri onclick="vsTrump()">Run it again</button><button onclick="pick(CS)">Back</button><button onclick="goTitle()">Title</button>`}
 goTitle();
 addEventListener('resize',fitLabels);
+// TEST MODE: gear button (top-right) toggles a panel. State persists in localStorage 'la_test'. Nothing Trump-related is rendered or loaded while it is off.
+function tmOn(){try{return localStorage.getItem('la_test')==='1'}catch(e){return false}}
+function tmGear(){let b=$('#tmgear');if(!b){b=document.createElement('button');b.id='tmgear';b.setAttribute('aria-label','Test mode');b.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.4zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>';b.onclick=()=>{try{localStorage.setItem('la_test',tmOn()?'0':'1')}catch(e){}tmPanel()};document.body.appendChild(b)}b.classList.toggle('on',tmOn());tmPanel()}
+function tmFight(){return G&&!G.trump&&!!$('#opts')&&G.r<G.rs.length}
+function tmEnd(win){if(!tmFight())return tmMsg('Start a debate first.');document.querySelectorAll('.modal').forEach(m=>m.remove());clearInterval(timerId);const g=G;g.busy=true;
+ if(win){if(g.side==='left'){g.anger=100;end('win')}else{g.resp=100;end('respect')}}else{if(g.side==='left'){g.comp=0;end('lose','You lost your composure! (test mode)')}else{g.anger=100;end('lose',g.op.unbeatable?smokyClose():'You lost your cool! (test mode)')}}}
+function tmClip(src,poster){playClip(src,poster,()=>tmMsg('Clip finished.'))}
+function tmMsg(t){const e=$('#tmmsg');if(e)e.textContent=t}
+function tmPanel(){let p=$('#tmpanel');if(!tmOn()){if(p)p.remove();return}
+ if(!p){p=document.createElement('div');p.id='tmpanel';document.body.appendChild(p)}
+ const clips=Object.entries(CLIPS).map(([k,f])=>`<button data-c="${f}">Win clip: ${(OPPONENTS.left.concat(OPPONENTS.right)[ART_KEYS.left.concat(ART_KEYS.right).indexOf(k)]||{}).short||k}</button>`).join('');
+ p.innerHTML=`<b>Test mode</b><small id=tmmsg></small><div class=tmrow><button id=tmw>WIN debate</button><button id=tml>LOSE debate</button></div>
+ <div class=tmrow>${clips}<button data-c="wilson_mock">Loss clip: Smoky Man</button><button id=tmx>Trump escalator clip</button></div>
+ <div class=tmrow><button id=tmu>Unlock Trump</button><button id=tmr>Relock Trump</button><button id=tmh>Hide panel</button></div>`;
+ p.querySelector('#tmw').onclick=()=>tmEnd(true);p.querySelector('#tml').onclick=()=>tmEnd(false);
+ p.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>tmClip(`assets/v/${b.dataset.c}.mp4`,`assets/v/${b.dataset.c}.jpg`));
+ p.querySelector('#tmx').onclick=()=>tmClip('assets/s/x3.mp4','assets/s/x4.jpg');
+ p.querySelector('#tmu').onclick=()=>{S.trump=true;save();tmMsg('Unlocked. Opening the Left ladder.');pick('left')};
+ p.querySelector('#tmr').onclick=()=>{S.trump=false;save();stopAll();tmMsg('Relocked.');goTitle()};
+ p.querySelector('#tmh').onclick=()=>{try{localStorage.setItem('la_test','0')}catch(e){}tmGear()}}
+tmGear();
